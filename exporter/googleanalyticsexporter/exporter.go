@@ -67,13 +67,37 @@ func (e *exporter) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	return nil
 }
 
-func logToGAMPEvent(log plog.LogRecord) (*GAMPEvent, error) {
+// returns event, valid, error
+func logToGAMPEvent(log plog.LogRecord) (*GAMPEvent, bool, error) {
 
-	event := GAMPEvent{
-		name: "event",
+	log_type, valid := log.Attributes().Get("log_type")
+
+	if !valid {
+		return nil, false, nil
 	}
 
-	return &event, nil
+	if log_type.Str() != "ga_event" {
+		return nil, false, nil
+	}
+
+	log_params, valid := log.Attributes().Get("ga_params")
+
+	if !valid {
+		return nil, false, nil
+	}
+
+	event_name, valid := log_params.Map().Get("ga_event_name")
+
+	if !valid {
+		return nil, false, nil
+	}
+
+	event := GAMPEvent{
+		name:   event_name.AsString(),
+		params: log_params.Map().AsRaw(),
+	}
+
+	return &event, true, nil
 }
 
 func logsToGALogs(logger *zap.Logger, ld plog.Logs) ([]*GAMPEvent, int) {
@@ -95,7 +119,10 @@ func logsToGALogs(logger *zap.Logger, ld plog.Logs) ([]*GAMPEvent, int) {
 			logs := sl.LogRecords()
 			for k := 0; k < logs.Len(); k++ {
 				log := logs.At(k)
-				event, err := logToGAMPEvent(log)
+				event, valid, err := logToGAMPEvent(log)
+				if !valid {
+					dropped++
+				}
 				if err != nil {
 					logger.Debug("Failed to convert to CloudWatch Log", zap.Error(err))
 					dropped++
