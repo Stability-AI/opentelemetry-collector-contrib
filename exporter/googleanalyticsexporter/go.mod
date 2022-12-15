@@ -1,4 +1,4 @@
-module github.com/Stability-AI/opentelemetry-collector-contrib/exporter/googleanalyticsexporter
+module stability/exporter/googleanalyticsexporter
 
 go 1.19
 

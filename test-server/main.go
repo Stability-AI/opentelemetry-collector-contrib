@@ -21,7 +21,8 @@ import (
 	"os"
 	"os/signal"
 
-	gafactory "github.com/Stability-AI/opentelemetry-collector-contrib/exporter/googleanalyticsexporter"
+	ga "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/googleanalyticsexporter"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
@@ -31,7 +32,7 @@ import (
 )
 
 // newExporter returns a console exporter.
-func newStdoutExporter(w io.Writer) (trace.SpanExporter, error) {
+func newExporter(w io.Writer) (trace.SpanExporter, error) {
 	return stdouttrace.New(
 		stdouttrace.WithWriter(w),
 		// Use human readable output.
@@ -42,7 +43,7 @@ func newStdoutExporter(w io.Writer) (trace.SpanExporter, error) {
 }
 
 // newResource returns a resource describing this application.
-func newStdoutResource() *resource.Resource {
+func newResource() *resource.Resource {
 	r, _ := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
@@ -65,16 +66,13 @@ func main() {
 	}
 	defer f.Close()
 
-	exp, err := newStdoutExporter(f)
-	if err != nil {
-		l.Fatal(err)
-	}
-
-	ga_exporter := gafactory.NewFactory()
+	exporter_fac := ga.NewFactory()
+	ga_exporter := exporter_fac.CreateLogsExporter(context.Background(), nil)
+	ga_exporter.ConsumeLogs(context.Background(), nil)
 
 	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
-		trace.WithResource(newStdoutResource()),
+		trace.WithBatcher(ga_exporter),
+		trace.WithResource(newResource()),
 	)
 	defer func() {
 		if err := tp.Shutdown(context.Background()); err != nil {
